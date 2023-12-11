@@ -5,7 +5,8 @@ class Config(dict):
     def __init__(self, config_path):
         with open(config_path, 'r') as f:
             self._yaml = f.read()
-            self._dict = yaml.load(self._yaml)
+            print("config.py#L8" ,config_path,self._yaml)
+            self._dict = yaml.safe_load(self._yaml)
             self._dict['PATH'] = os.path.dirname(config_path)
 
     def __getattr__(self, name):

@@ -7,7 +7,8 @@ import numpy as np
 import torchvision.transforms.functional as F
 from torch.utils.data import DataLoader
 from PIL import Image
-from scipy.misc import imread
+# from scipy.misc import imread
+from imageio import imread
 from skimage.feature import canny
 from skimage.color import rgb2gray, gray2rgb
 from .utils import create_mask
@@ -52,23 +53,29 @@ class Dataset(torch.utils.data.Dataset):
     def load_item(self, index):
 
         size = self.input_size
+        print("\ndataset.py#L56", "size", size)
 
         # load image
         img = imread(self.data[index])
+        print("dataset.py#L56", "img", img.shape)
 
         # gray to rgb
         if len(img.shape) < 3:
             img = gray2rgb(img)
+            print("dataset.py#L56", "gray2rgb", img.shape)
 
         # resize/crop if needed
         if size != 0:
             img = self.resize(img, size, size)
+            print("dataset.py#L56", "resize", img.shape)
 
         # create grayscale image
         img_gray = rgb2gray(img)
+        print("dataset.py#L74", "rgb2gray", img_gray.shape)
 
         # load mask
         mask = self.load_mask(img, index)
+        print("dataset.py#L78", "load_mask", mask.shape)
 
         # load edge
         edge = self.load_edge(img_gray, index, mask)
@@ -87,19 +94,19 @@ class Dataset(torch.utils.data.Dataset):
 
         # in test mode images are masked (with masked regions),
         # using 'mask' parameter prevents canny to detect edges for the masked regions
-        mask = None if self.training else (1 - mask / 255).astype(np.bool)
+        mask = None if self.training else (1 - mask / 255).astype(bool)
 
         # canny
         if self.edge == 1:
             # no edge
             if sigma == -1:
-                return np.zeros(img.shape).astype(np.float)
+                return np.zeros(img.shape).astype(float)
 
             # random sigma
             if sigma == 0:
                 sigma = random.randint(1, 4)
 
-            return canny(img, sigma=sigma, mask=mask).astype(np.float)
+            return canny(img, sigma=sigma, mask=mask).astype(float)
 
         # external
         else:
@@ -114,6 +121,7 @@ class Dataset(torch.utils.data.Dataset):
             return edge
 
     def load_mask(self, img, index):
+        print("in load_mask", "img.shape", img.shape,"self.mask",self.mask)
         imgh, imgw = img.shape[0:2]
         mask_type = self.mask
 
@@ -145,6 +153,7 @@ class Dataset(torch.utils.data.Dataset):
         # test mode: load mask non random
         if mask_type == 6:
             mask = imread(self.mask_data[index])
+            print("\t#156",mask.shape, imgh, imgw)
             mask = self.resize(mask, imgh, imgw, centerCrop=False)
             mask = rgb2gray(mask)
             mask = (mask > 0).astype(np.uint8) * 255
@@ -157,6 +166,7 @@ class Dataset(torch.utils.data.Dataset):
 
     def resize(self, img, height, width, centerCrop=True):
         imgh, imgw = img.shape[0:2]
+        print("img.shape", img.shape)
 
         if centerCrop and imgh != imgw:
             # center crop
@@ -165,9 +175,13 @@ class Dataset(torch.utils.data.Dataset):
             i = (imgw - side) // 2
             img = img[j:j + side, i:i + side, ...]
 
-        img = scipy.misc.imresize(img, [height, width])
+        img = np.array(Image.fromarray(img).resize((width,height))).reshape((width,height))
+        img_rgb = np.zeros((height, width, 3))
+        img_rgb[:,:,2] = img
+        print("img_rgb.shape",img_rgb.shape)
+        # img = scipy.misc.imresize(img, [height, width])
 
-        return img
+        return img_rgb
 
     def load_flist(self, flist):
         if isinstance(flist, list):
